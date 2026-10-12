@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カプセルトイ進化パズル</title>
+  <!-- Matter.js 物理エンジン -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at center, #2b1055 0%, #7597de 50%, #11002c 100%);
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #header {
+      width: 400px;
+      max-width: 95vw;
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 16px 16px 0 0;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-bottom: none;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+    .score-group {
+      display: flex;
+      flex-direction: column;
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .score-group span {
+      font-size: 16px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .next-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    #next-preview {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.5), 0 4px 8px rgba(0,0,0,0.3);
+    }
+    #sound-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transition: transform 0.1s ease;
+    }
+    #sound-btn:active {
+      transform: scale(0.9);
+    }
+    #game-container {
+      position: relative;
+      width: 400px;
+      height: 600px;
+      max-width: 95vw;
+      max-height: 75vh;
+      background: rgba(15, 12, 41, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 1px dashed rgba(255, 255, 255, 0.4);
+      border-radius: 0 0 20px 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #game-over-modal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 5, 25, 0.9);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      z-index: 10;
+    }
+    #game-over-modal.hidden {
+      display: none;
+    }
+    #game-over-modal h2 {
+      font-size: 36px;
+      margin: 0;
+      background: linear-gradient(45deg, #ff4e50, #f9d423);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 4px 10px rgba(255, 78, 80, 0.3);
+    }
+    #game-over-modal p {
+      font-size: 18px;
+      margin: 0;
+      font-weight: bold;
+    }
+    .btn {
+      padding: 12px 32px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #fff;
+      background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%);
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255, 8, 68, 0.4);
+      transition: transform 0.1s ease;
+    }
+    .btn:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <div class="score-group">SCORE: <span id="score">0</span></div>
+    <div class="score-group">HIGH: <span id="high-score">0</span></div>
+    <div class="header-right">
+      <div class="next-container">
+        NEXT: <div id="next-preview">🍬</div>
+      </div>
+      <button id="sound-btn" onclick="toggleSound()">🔊</button>
+    </div>
+  </div>
+
+  <div id="game-container">
+    <div id="game-over-modal" class="hidden">
+      <h2>GAME OVER</h2>
+      <p>スコア: <span id="final-score">0</span></p>
+      <p>ハイスコア: <span id="final-high-score">0</span></p>
+      <button class="btn" onclick="resetGame()">もう一度あそぶ</button>
+    </div>
+  </div>
+
+<script>
+  const CAPSULE_TYPES = [
+    { name: "ミニカプセル",   radius: 15, score: 2,    topColor: "#ff7675", bottomColor: "#ffffff", emoji: "🍬" },
+    { name: "ノーマルカプセル", radius: 22, score: 6,    topColor: "#74b9ff", bottomColor: "#ffffff", emoji: "🔑" },
+    { name: "レアカプセル",   radius: 30, score: 12,   topColor: "#55efc4", bottomColor: "#ffffff", emoji: "🧸" },
+    { name: "スーパーレア",   radius: 40, score: 20,   topColor: "#a29bfe", bottomColor: "#ffffff", emoji: "🤖" },
+    { name: "ウルトラレア",   radius: 52, score: 35,   topColor: "#fdcb6e", bottomColor: "#ffffff", emoji: "👑" },
+    { name: "シークレット",   radius: 65, score: 55,   topColor: "#e84393", bottomColor: "#ffeaa7", emoji: "🦄" },
+    { name: "ロボット特大",   radius: 78, score: 80,   topColor: "#00cec9", bottomColor: "#dfe6e9", emoji: "🚀" },
+    { name: "プレミアム宝箱", radius: 92, score: 110,  topColor: "#fd79a8", bottomColor: "#ffeaa7", emoji: "💎" },
+    { name: "惑星フィギュア", radius: 106, score: 150, topColor: "#6c5ce7", bottomColor: "#a29bfe", emoji: "🪐" },
+    { name: "宇宙ステーション", radius: 120, score: 200, topColor: "#2d3436", bottomColor: "#b2bec3", emoji: "🌌" }
+  ];
+
+  const CONTAINER_WIDTH = 400;
+  const CONTAINER_HEIGHT = 600;
+  const DEADLINE_Y = 80;
+
+  let Engine = Matter.Engine,
+      Render = Matter.Render,
+      Runner = Matter.Runner,
+      Bodies = Matter.Bodies,
+      Composite = Matter.Composite,
+      Events = Matter.Events;
+
+  let engine, render, runner;
+  let score = 0;
+  let highScore = localStorage.getItem('capsule_highscore') || 0;
+  let currentBodyIndex = 0;
+  let canDrop = true;
+  let isGameOver = false;
+  let pointerX = CONTAINER_WIDTH / 2;
+
+  let audioCtx = null;
+  let isSoundEnabled = localStorage.getItem('capsule_sound') !== 'false';
+  let mergeQueue = []; // 安全な合体処理用キュー
+
+  const container = document.getElementById('game-container');
+  const scoreEl = document.getElementById('score');
+  const highScoreEl = document.getElementById('high-score');
+  const finalScoreEl = document.getElementById('final-score');
+  const finalHighScoreEl = document.getElementById('final-high-score');
+  const nextPreviewEl = document.getElementById('next-preview');
+  const soundBtn = document.getElementById('sound-btn');
+  const gameOverModal = document.getElementById('game-over-modal');
+
+  highScoreEl.textContent = highScore;
+  updateSoundButtonUI();
+
+  function toggleSound() {
+    isSoundEnabled = !isSoundEnabled;
+    localStorage.setItem('capsule_sound', isSoundEnabled);
+    updateSoundButtonUI();
+    if (isSoundEnabled) initAudio();
+  }
+
+  function updateSoundButtonUI() {
+    soundBtn.textContent = isSoundEnabled ? "🔊" : "🔇";
+  }
+
+  function initAudio() {
+    if (!audioCtx && isSoundEnabled) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  function playDropSound() {
+    if (!isSoundEnabled) return;
+    initAudio();
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.08);
+  }
+
+  function playMergeSound(level) {
+    if (!isSoundEnabled) return;
+    initAudio();
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    const baseFreq = 220 + level * 50;
+    osc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, audioCtx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.12);
+  }
+
+  function init() {
+    engine = Engine.create();
+    engine.gravity.y = 1.0;
+
+    render = Render.create({
+      element: container,
+      engine: engine,
+      options: {
+        width: CONTAINER_WIDTH,
+        height: CONTAINER_HEIGHT,
+        wireframes: false,
+        background: 'transparent'
+      }
+    });
+
+    Render.run(render);
+    runner = Runner.create();
+    Runner.run(runner, engine);
+
+    const wallOptions = { isStatic: true, friction: 0.3, restitution: 0.2 };
+    const ground = Bodies.rectangle(CONTAINER_WIDTH / 2, CONTAINER_HEIGHT + 30, CONTAINER_WIDTH, 60, wallOptions);
+    const leftWall = Bodies.rectangle(-30, CONTAINER_HEIGHT / 2, 60, CONTAINER_HEIGHT * 2, wallOptions);
+    const rightWall = Bodies.rectangle(CONTAINER_WIDTH + 30, CONTAINER_HEIGHT / 2, 60, CONTAINER_HEIGHT * 2, wallOptions);
+
+    Composite.add(engine.world, [ground, leftWall, rightWall]);
+
+    // イベント登録：衝突開始時はキューに積む、更新直後に安全に処理する
+    Events.on(engine, 'collisionStart', handleCollision);
+    Events.on(engine, 'afterUpdate', processMerges);
+    Events.on(render, 'afterRender', customRender);
+
+    setNextSpawn();
+
+    container.addEventListener('pointermove', handlePointerMove);
+    container.addEventListener('pointerdown', handlePointerDown);
+  }
+
+  function getRandomSpawnIndex() {
+    return Math.floor(Math.random() * 4);
+  }
+
+  function setNextSpawn() {
+    currentBodyIndex = getRandomSpawnIndex();
+    const item = CAPSULE_TYPES[currentBodyIndex];
+    nextPreviewEl.textContent = item.emoji;
+    nextPreviewEl.style.background = `linear-gradient(135deg, ${item.topColor} 50%, ${item.bottomColor} 50%)`;
+  }
+
+  function createCapsuleBody(x, y, level) {
+    const data = CAPSULE_TYPES[level];
+    const body = Bodies.circle(x, y, data.radius, {
+      friction: 0.3,
+      restitution: 0.25,
+      render: { visible: false }
+    });
+    body.level = level;
+    body.isMerged = false;
+    return body;
+  }
+
+  function handlePointerMove(e) {
+    const rect = container.getBoundingClientRect();
+    let x = (e.clientX - rect.left) * (CONTAINER_WIDTH / rect.width);
+    const radius = CAPSULE_TYPES[currentBodyIndex].radius;
+    pointerX = Math.max(radius, Math.min(CONTAINER_WIDTH - radius, x));
+  }
+
+  function handlePointerDown(e) {
+    if (!canDrop || isGameOver) return;
+
+    handlePointerMove(e);
+    const dropIndex = currentBodyIndex;
+    const newBody = createCapsuleBody(pointerX, DEADLINE_Y, dropIndex);
+    Composite.add(engine.world, newBody);
+
+    playDropSound();
+
+    canDrop = false;
+    setNextSpawn();
+
+    setTimeout(() => {
+      if (!isGameOver) canDrop = true;
+    }, 500);
+  }
+
+  // 衝突検知時はキューに溜めるだけ（物理演算を邪魔しない）
+  function handleCollision(event) {
+    const pairs = event.pairs;
+
+    for (let i = 0; i < pairs.length; i++) {
+      const { bodyA, bodyB } = pairs[i];
+
+      if (bodyA.level === undefined || bodyB.level === undefined) continue;
+      if (bodyA.isMerged || bodyB.isMerged) continue;
+
+      if (bodyA.level === bodyB.level) {
+        bodyA.isMerged = true;
+        bodyB.isMerged = true;
+        mergeQueue.push({ bodyA, bodyB, level: bodyA.level });
+      }
+    }
+  }
+
+  // 物理ステップ終了後に安全に合体・削除・生成を行う
+  function processMerges() {
+    if (mergeQueue.length === 0) return;
+
+    const currentMerges = [...mergeQueue];
+    mergeQueue = [];
+
+    const world = engine.world;
+
+    for (let i = 0; i < currentMerges.length; i++) {
+      const { bodyA, bodyB, level } = currentMerges[i];
+
+      // ワールド内にまだ両方のボディが確実に存在するか確認
+      if (!Composite.get(world, bodyA.id, 'body') || !Composite.get(world, bodyB.id, 'body')) {
+        continue;
+      }
+
+      playMergeSound(level);
+
+      if (level < CAPSULE_TYPES.length - 1) {
+        const nextLevel = level + 1;
+        const newX = (bodyA.position.x + bodyB.position.x) / 2;
+        const newY = (bodyA.position.y + bodyB.position.y) / 2;
+
+        Composite.remove(world, [bodyA, bodyB]);
+
+        const upgradedBody = createCapsuleBody(newX, newY, nextLevel);
+        Composite.add(world, upgradedBody);
+
+        score += CAPSULE_TYPES[nextLevel].score;
+      } else {
+        Composite.remove(world, [bodyA, bodyB]);
+        score += CAPSULE_TYPES[level].score * 2;
+      }
+
+      scoreEl.textContent = score;
+      if (score > highScore) {
+        highScore = score;
+        highScoreEl.textContent = highScore;
+        localStorage.setItem('capsule_highscore', highScore);
+      }
+    }
+  }
+
+  function customRender() {
+    const ctx = render.context;
+
+    if (!isGameOver) {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(pointerX, DEADLINE_Y);
+      ctx.lineTo(pointerX, CONTAINER_HEIGHT);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.strokeStyle = "rgba(255, 78, 80, 0.6)";
+    ctx.setLineDash([6, 6]);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, DEADLINE_Y);
+    ctx.lineTo(CONTAINER_WIDTH, DEADLINE_Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const bodies = Composite.allBodies(engine.world);
+    for (let body of bodies) {
+      if (body.level !== undefined) {
+        const data = CAPSULE_TYPES[body.level];
+        const { x, y } = body.position;
+        const r = data.radius;
+        const angle = body.angle;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 4;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI);
+        ctx.fillStyle = data.bottomColor;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r, Math.PI, Math.PI * 2);
+        ctx.fillStyle = data.topColor;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+
+        ctx.beginPath();
+        ctx.moveTo(-r, 0);
+        ctx.lineTo(r, 0);
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.25)";
+        ctx.lineWidth = Math.max(2, r * 0.08);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.lineWidth = 2;
+        ctx.max;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(-r * 0.3, -r * 0.3, r * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+        ctx.fill();
+
+        ctx.font = `${r * 0.9}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(data.emoji, 0, 0);
+
+        ctx.restore();
+
+        if (!body.isStatic && body.position.y < DEADLINE_Y && body.velocity.y > -0.5 && body.position.y > 0) {
+          triggerGameOver();
+        }
+      }
+    }
+  }
+
+  function triggerGameOver() {
+    if (isGameOver) return;
+    isGameOver = true;
+    canDrop = false;
+    finalScoreEl.textContent = score;
+    finalHighScoreEl.textContent = highScore;
+    gameOverModal.classList.remove('hidden');
+  }
+
+  function resetGame() {
+    Composite.clear(engine.world, false, true);
+    mergeQueue = [];
+    score = 0;
+    scoreEl.textContent = 0;
+    isGameOver = false;
+    canDrop = true;
+    gameOverModal.classList.add('hidden');
+
+    const wallOptions = { isStatic: true, friction: 0.3, restitution: 0.2 };
+    const ground = Bodies.rectangle(CONTAINER_WIDTH / 2, CONTAINER_HEIGHT + 30, CONTAINER_WIDTH, 60, wallOptions);
+    const leftWall = Bodies.rectangle(-30, CONTAINER_HEIGHT / 2, 60, CONTAINER_HEIGHT * 2, wallOptions);
+    const rightWall = Bodies.rectangle(CONTAINER_WIDTH + 30, CONTAINER_HEIGHT / 2, 60, CONTAINER_HEIGHT * 2, wallOptions);
+    Composite.add(engine.world, [ground, leftWall, rightWall]);
+
+    setNextSpawn();
+  }
+
+  window.onload = init;
+</script>
+</body>
+</html>
